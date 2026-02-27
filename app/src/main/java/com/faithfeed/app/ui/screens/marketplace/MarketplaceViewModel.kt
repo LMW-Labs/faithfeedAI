@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import androidx.paging.PagingData
 import androidx.paging.cachedIn
 import com.faithfeed.app.data.model.MarketplaceItem
+import com.faithfeed.app.data.repository.AuthRepository
 import com.faithfeed.app.data.repository.MarketplaceRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -14,13 +15,24 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 @OptIn(ExperimentalCoroutinesApi::class)
 @HiltViewModel
 class MarketplaceViewModel @Inject constructor(
-    private val marketplaceRepository: MarketplaceRepository
+    private val marketplaceRepository: MarketplaceRepository,
+    private val authRepository: AuthRepository
 ) : ViewModel() {
+
+    private val _currentUserId = MutableStateFlow("")
+    val currentUserId: StateFlow<String> = _currentUserId.asStateFlow()
+
+    init {
+        viewModelScope.launch {
+            _currentUserId.value = authRepository.currentUser()?.id ?: ""
+        }
+    }
 
     private val _category = MutableStateFlow<String?>(null)
     val category: StateFlow<String?> = _category.asStateFlow()

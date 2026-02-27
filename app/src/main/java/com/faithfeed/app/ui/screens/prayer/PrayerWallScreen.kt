@@ -8,7 +8,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.outlined.FavoriteBorder
 import androidx.compose.material.icons.outlined.VolunteerActivism
 import androidx.compose.material3.*
@@ -39,20 +38,23 @@ fun PrayerWallScreen(
     viewModel: PrayerWallViewModel = hiltViewModel()
 ) {
     val prayers by viewModel.prayers.collectAsStateWithLifecycle()
+    val currentUserId by viewModel.currentUserId.collectAsStateWithLifecycle()
 
     Scaffold(
         containerColor = FaithFeedColors.BackgroundPrimary,
         topBar = {
-            FaithFeedTopBar(title = "Prayer Wall")
-        },
-        floatingActionButton = {
-            FloatingActionButton(
-                onClick = { navController.navigate(Route.CreatePrayer) },
-                containerColor = FaithFeedColors.GoldAccent,
-                contentColor = FaithFeedColors.BackgroundPrimary
-            ) {
-                Icon(Icons.Default.Add, contentDescription = "Create Prayer")
-            }
+            FaithFeedTopBar(
+                title = "Prayer Wall",
+                onSearchClick = { navController.navigate(Route.SemanticSearch) },
+                onNotificationsClick = { navController.navigate(Route.Notifications) },
+                onProfileClick = {
+                    if (currentUserId.isNotBlank()) navController.navigate(Route.MyProfile(currentUserId))
+                },
+                onCreatePost = { navController.navigate(Route.CreatePost) },
+                onCreateStory = { navController.navigate(Route.CreateStory) },
+                onCreateListing = { navController.navigate(Route.CreateListing) },
+                onCreatePrayer = { navController.navigate(Route.CreatePrayer) }
+            )
         }
     ) { paddingValues ->
         Box(

@@ -9,7 +9,6 @@ import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material.icons.outlined.Storefront
 import androidx.compose.material3.*
@@ -47,6 +46,7 @@ fun MarketplaceScreen(
     val items = viewModel.items.collectAsLazyPagingItems()
     val category by viewModel.category.collectAsStateWithLifecycle()
     val searchQuery by viewModel.searchQuery.collectAsStateWithLifecycle()
+    val currentUserId by viewModel.currentUserId.collectAsStateWithLifecycle()
     var showSearch by remember { mutableStateOf(false) }
 
     Scaffold(
@@ -55,7 +55,14 @@ fun MarketplaceScreen(
             FaithFeedTopBar(
                 title = "Marketplace",
                 onSearchClick = { showSearch = !showSearch },
-                onCreateListing = { navController.navigate(Route.CreateListing) }
+                onNotificationsClick = { navController.navigate(Route.Notifications) },
+                onProfileClick = {
+                    if (currentUserId.isNotBlank()) navController.navigate(Route.MyProfile(currentUserId))
+                },
+                onCreatePost = { navController.navigate(Route.CreatePost) },
+                onCreateStory = { navController.navigate(Route.CreateStory) },
+                onCreateListing = { navController.navigate(Route.CreateListing) },
+                onCreatePrayer = { navController.navigate(Route.CreatePrayer) }
             )
         }
     ) { paddingValues ->
@@ -152,18 +159,6 @@ fun MarketplaceScreen(
                             }
                         }
                     }
-                }
-
-                FloatingActionButton(
-                    onClick = { navController.navigate(Route.CreateListing) },
-                    modifier = Modifier
-                        .align(Alignment.BottomEnd)
-                        .padding(16.dp)
-                        .navigationBarsPadding(),
-                    containerColor = FaithFeedColors.GoldAccent,
-                    contentColor = FaithFeedColors.BackgroundPrimary
-                ) {
-                    Icon(Icons.Default.Add, contentDescription = "Create Listing")
                 }
             }
         }
