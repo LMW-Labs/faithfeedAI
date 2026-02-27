@@ -53,7 +53,7 @@ fun MarketplaceScreen(
         containerColor = FaithFeedColors.BackgroundPrimary,
         topBar = {
             FaithFeedTopBar(
-                title = "Marketplace",
+                title = "Exchange",
                 onSearchClick = { showSearch = !showSearch },
                 onNotificationsClick = { navController.navigate(Route.Notifications) },
                 onProfileClick = {

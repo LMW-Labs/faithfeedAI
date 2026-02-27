@@ -51,7 +51,7 @@ private val navItems = listOf(
     NavItem(Route.Home, "Home", Icons.Filled.Home, Icons.Outlined.Home),
     NavItem(Route.BibleReader, "Bible", Icons.Filled.AutoStories, Icons.Outlined.AutoStories),
     NavItem(Route.Explore, "Explore", Icons.Filled.Explore, Icons.Outlined.Explore),
-    NavItem(Route.Marketplace, "Market", Icons.Filled.Storefront, Icons.Outlined.Storefront),
+    NavItem(Route.Marketplace, "Exchange", Icons.Filled.Storefront, Icons.Outlined.Storefront),
     NavItem(Route.PrayerWall, "Prayer", Icons.Filled.VolunteerActivism, Icons.Outlined.VolunteerActivism)
 )
 
