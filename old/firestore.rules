@@ -1,0 +1,551 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Helper functions
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isValidUser() {
+      return isSignedIn() &&
+          exists(/databases/$(database)/documents/users/$(request.auth.uid));
+    }
+
+    // === USERS COLLECTION ===
+    match /users/{userId} {
+      allow read: if isSignedIn();
+      allow create, update: if isOwner(userId);
+      allow delete: if false;
+
+      // Friends subcollection
+      // Users can read their own friends, and write to add themselves as a friend
+      // (needed for friend request acceptance where both users need documents created)
+      match /friends/{friendId} {
+        allow read: if isOwner(userId);
+        // Allow write if:
+        // 1. Owner writing to their own friends collection, OR
+        // 2. The friend being added is writing (to add themselves when accepting request)
+        allow write: if isOwner(userId) || request.auth.uid == friendId;
+      }
+
+      // Interests subcollection (for LFS feed personalization)
+      match /interests/{interestId} {
+        allow read, write: if request.auth != null && request.auth.uid == userId;
+      }
+
+      // Following subcollection (for LFS feed calculation)
+      match /following/{followingId} {
+        allow read, write: if request.auth != null && request.auth.uid == userId;
+      }
+
+      // Study verses subcollection - MORE EXPLICIT RULE
+      match /studyVerses/{verseId} {
+        allow read, write: if request.auth != null && request.auth.uid == userId;
+      }
+
+      // AI Library subcollection (saved devotionals, sermons, etc.)
+      match /aiLibrary/{contentId} {
+        allow read, write: if request.auth != null && request.auth.uid == userId;
+      }
+
+      // Premium subscription subcollection
+      match /premium/{subscriptionId} {
+        allow read, write: if request.auth != null && request.auth.uid == userId;
+      }
+
+      // Subscription status subcollection (for premium status tracking)
+      match /subscription/{docId} {
+        allow read, write: if request.auth != null && request.auth.uid == userId;
+      }
+
+      // Study Plans subcollection
+      match /studyPlans/{planId} {
+        allow read, write: if request.auth != null && request.auth.uid == userId;
+      }
+
+      // Notifications subcollection
+      match /notifications/{notificationId} {
+        allow read, write: if request.auth != null && request.auth.uid == userId;
+      }
+
+      // Favorite Videos subcollection
+      match /favoriteVideos/{videoId} {
+        allow read, write: if request.auth != null && request.auth.uid == userId;
+      }
+
+      // Video History subcollection
+      match /videoHistory/{historyId} {
+        allow read, write: if request.auth != null && request.auth.uid == userId;
+      }
+    }
+
+    // === FRIEND REQUESTS COLLECTION ===
+    match /friendRequests/{requestId} {
+      // Signed-in users can read requests (queries filter by userId anyway)
+      allow read: if isSignedIn();
+      // Users can create requests where they are the sender
+      allow create: if isSignedIn() &&
+        request.resource.data.fromUserId == request.auth.uid;
+      // Recipient can update status (accept/decline), sender can delete (cancel)
+      allow update: if isSignedIn() &&
+        resource.data.toUserId == request.auth.uid;
+      allow delete: if isSignedIn() &&
+        resource.data.fromUserId == request.auth.uid;
+    }
+
+    // === VERSES COLLECTION (Read-only Bible data) ===
+    match /verses/{verseId} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    // === USER-GENERATED CONTENT ===
+
+    // User Posts
+    match /userPosts/{postId} {
+      allow read: if isSignedIn();
+      allow create: if isValidUser() &&
+          request.resource.data.userId == request.auth.uid;
+      allow update: if isOwner(resource.data.userId) || 
+          (isSignedIn() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['engagement', 'likeCount', 'commentCount', 'shareCount']));
+      allow delete: if isOwner(resource.data.userId);
+
+      // Comments subcollection
+      match /comments/{commentId} {
+        allow read: if isSignedIn();
+        allow create: if isValidUser() &&
+            request.resource.data.userId == request.auth.uid;
+        allow update, delete: if isOwner(resource.data.userId);
+      }
+
+      // Likes subcollection (for LFS optimization)
+      match /likes/{userId} {
+        allow read: if isSignedIn();
+        allow create: if isValidUser() && userId == request.auth.uid;
+        allow delete: if isSignedIn() && userId == request.auth.uid;
+      }
+
+      // Negative Signals subcollection (for spam detection)
+      match /negativeSignals/{signalId} {
+        allow read: if isSignedIn();
+        allow create: if isValidUser();
+        allow delete: if isSignedIn() && resource.data.userId == request.auth.uid;
+      }
+
+      // Prayers subcollection (for unique prayer tracking)
+      match /prayers/{userId} {
+        allow read: if isSignedIn();
+        allow create: if isValidUser() && userId == request.auth.uid;
+        allow delete: if isSignedIn() && userId == request.auth.uid;
+      }
+    }
+
+    // User Stories
+    match /userStories/{storyId} {
+      allow read: if isSignedIn();
+      allow create: if isValidUser() &&
+          request.resource.data.userId == request.auth.uid;
+      allow update, delete: if isOwner(resource.data.userId);
+    }
+
+    // Stories (alternative collection name)
+    match /stories/{storyId} {
+      allow read: if isSignedIn();
+      allow create: if isValidUser() &&
+          request.resource.data.userId == request.auth.uid;
+      allow update, delete: if isOwner(resource.data.userId);
+
+      // Story comments subcollection
+      match /comments/{commentId} {
+        allow read: if isSignedIn();
+        allow create: if isValidUser() &&
+            request.resource.data.userId == request.auth.uid;
+        allow update, delete: if isOwner(resource.data.userId);
+      }
+    }
+
+    // Post Comments
+    match /postComments/{commentId} {
+      allow read: if isSignedIn();
+      allow create: if isValidUser() &&
+          request.resource.data.userId == request.auth.uid;
+      allow update, delete: if isOwner(resource.data.userId);
+    }
+
+    // Story Comments
+    match /storyComments/{commentId} {
+      allow read: if isSignedIn();
+      allow create: if isValidUser() &&
+          request.resource.data.userId == request.auth.uid;
+      allow update, delete: if isOwner(resource.data.userId);
+    }
+
+    // User Bookmarks (Private)
+    match /userBookmarks/{userId} {
+      allow read: if isOwner(userId);
+      allow write: if isOwner(userId);
+
+      // Subcollections for bookmarks
+      match /verses/{verseId} {
+        allow read, write: if isOwner(userId);
+      }
+      match /posts/{postId} {
+        allow read, write: if isOwner(userId);
+      }
+    }
+
+    // Chats
+    match /chats/{chatId} {
+      allow read: if isSignedIn() &&
+          request.auth.uid in resource.data.participants;
+      allow create: if isValidUser() &&
+          request.auth.uid in request.resource.data.participants;
+      allow update: if isSignedIn() &&
+          request.auth.uid in resource.data.participants;
+
+      // Chat messages subcollection
+      match /messages/{messageId} {
+        allow read: if isSignedIn() &&
+            request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.participants;
+        allow create: if isValidUser() &&
+            request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.participants &&
+            request.resource.data.senderId == request.auth.uid;
+      }
+    }
+
+    // Chat Messages (if separate collection)
+    match /chat_messages/{messageId} {
+      allow read: if isSignedIn();
+      allow create: if isValidUser() &&
+          request.resource.data.senderId == request.auth.uid;
+      allow update, delete: if isOwner(resource.data.senderId);
+    }
+
+    // Friends
+    match /friends/{friendshipId} {
+      allow read: if isSignedIn() &&
+          (request.auth.uid == resource.data.userId1 ||
+              request.auth.uid == resource.data.userId2);
+      allow create: if isValidUser() &&
+          (request.auth.uid == request.resource.data.userId1 ||
+              request.auth.uid == request.resource.data.userId2);
+      allow update: if isSignedIn() &&
+          (request.auth.uid == resource.data.userId1 ||
+              request.auth.uid == resource.data.userId2);
+      allow delete: if isSignedIn() &&
+          (request.auth.uid == resource.data.userId1 ||
+              request.auth.uid == resource.data.userId2);
+    }
+
+    // === PRAYER WALL ===
+    match /prayers/{prayerId} {
+      allow read: if isSignedIn();
+      allow create: if isValidUser() &&
+          request.resource.data.userId == request.auth.uid;
+      allow update: if isSignedIn(); // Allow anyone to update prayer count
+      allow delete: if isOwner(resource.data.userId);
+    }
+
+    // Prayer Requests (alternative collection name)
+    match /prayerRequests/{prayerId} {
+      allow read: if isSignedIn();
+      allow create: if isValidUser() &&
+          request.resource.data.userId == request.auth.uid;
+      allow update: if isSignedIn(); // Allow anyone to pray/update prayer count
+      allow delete: if isOwner(resource.data.userId);
+
+      // Prayers subcollection (for optimization)
+      match /prayers/{userId} {
+        allow read: if isSignedIn();
+        allow create: if isValidUser() && userId == request.auth.uid;
+        allow delete: if isSignedIn() && userId == request.auth.uid;
+      }
+    }
+
+    // === MARKETPLACE ===
+    match /marketplaceItems/{itemId} {
+      allow read: if isSignedIn();
+      allow create: if isValidUser() &&
+          request.resource.data.userId == request.auth.uid;
+      allow update, delete: if isOwner(resource.data.userId);
+
+      // Saved subcollection (for optimization)
+      match /saved/{userId} {
+        allow read: if isSignedIn();
+        allow create: if isValidUser() && userId == request.auth.uid;
+        allow delete: if isSignedIn() && userId == request.auth.uid;
+      }
+
+      // Interested subcollection (for optimization)
+      match /interested/{userId} {
+        allow read: if isSignedIn();
+        allow create: if isValidUser() && userId == request.auth.uid;
+        allow delete: if isSignedIn() && userId == request.auth.uid;
+      }
+    }
+
+    // Marketplace Conversations
+    match /marketplaceConversations/{conversationId} {
+      allow read: if isSignedIn();
+      allow create: if isValidUser();
+      allow update: if isSignedIn();
+
+      // Messages subcollection
+      match /messages/{messageId} {
+        allow read: if isSignedIn();
+        allow create: if isValidUser();
+      }
+    }
+
+    // === VIDEO CONTENT ===
+    match /videos/{videoId} {
+      allow read: if isSignedIn();
+      allow create: if isValidUser();
+      allow update, delete: if isSignedIn();
+    }
+
+    // Curated Video Content (admin-managed)
+    match /videoContent/{videoId} {
+      allow read: if isSignedIn();
+      allow write: if false; // Only admins via backend
+    }
+
+    // Video Requests (user-submitted channel requests)
+    match /videoRequests/{requestId} {
+      allow read: if isSignedIn();
+      allow create: if isValidUser() &&
+          request.resource.data.userId == request.auth.uid;
+      allow update, delete: if false; // Only admins via backend
+    }
+
+    // === DAILY VERSES ===
+    match /dailyVerses/{dateId} {
+      allow read: if isSignedIn();
+      allow write: if false; // Only backend can write
+    }
+
+    // === AI CACHE (for cost optimization) ===
+    match /aiCache/{cacheId} {
+      allow read: if isSignedIn();
+      allow write: if false; // Only backend can write
+    }
+
+    // === THEMATIC VERSES (pre-seeded theme guidance) ===
+    match /thematicVerses/{themeId} {
+      allow read: if isSignedIn();
+      allow write: if false; // Only backend/seed scripts can write
+    }
+
+    // === THEMATIC GUIDANCE (pre-seeded themes with verses) ===
+    match /thematicGuidance/{themeId} {
+      allow read: if isSignedIn();
+      allow write: if false; // Only backend/seed scripts can write
+    }
+
+    // === THEMES (alternative collection for thematic content) ===
+    match /themes/{themeId} {
+      allow read: if isSignedIn();
+      allow write: if false; // Only backend/seed scripts can write
+    }
+
+    // === NOTIFICATIONS (Top-level collection) ===
+    match /notifications/{notificationId} {
+      // Support both userId (legacy) and recipientId (new format)
+      allow read: if isSignedIn() &&
+        (resource.data.userId == request.auth.uid || resource.data.recipientId == request.auth.uid);
+      allow create: if false; // Only Cloud Functions can create
+      allow update: if isSignedIn() &&
+        (resource.data.userId == request.auth.uid || resource.data.recipientId == request.auth.uid);
+      allow delete: if isSignedIn() &&
+        (resource.data.userId == request.auth.uid || resource.data.recipientId == request.auth.uid);
+    }
+
+    // === BETA APPLICATIONS (Public form submissions) ===
+    match /betaApplications/{applicationId} {
+      allow read: if true; // Admin dashboard uses password protection at app level
+      allow create: if true; // Allow anyone to submit the beta form
+      allow update, delete: if false; // Only admins via SDK
+    }
+
+    // === ADMIN NOTIFICATIONS (for admin dashboard task tracking) ===
+    match /adminNotifications/{notificationId} {
+      allow read, write: if true; // Protected by password at API level
+    }
+
+    // === USERNAMES (for username reservation) ===
+    match /usernames/{username} {
+      allow read: if isSignedIn();
+      allow create, update: if isSignedIn() &&
+          request.resource.data.uid == request.auth.uid;
+      allow delete: if isSignedIn() &&
+          resource.data.uid == request.auth.uid;
+    }
+
+    // === BUSINESS PAGES ===
+    match /businessPages/{pageId} {
+      allow read: if isSignedIn();
+      allow create: if isValidUser() &&
+          request.resource.data.ownerId == request.auth.uid;
+      allow update, delete: if isSignedIn() &&
+          resource.data.ownerId == request.auth.uid;
+    }
+
+    // === GROUPS (Bible Study Groups) ===
+    match /groups/{groupId} {
+      // Anyone signed in can read public groups, members can read private groups
+      allow read: if isSignedIn();
+
+      // Authenticated users can create groups (must be the creator)
+      allow create: if isValidUser() &&
+          request.resource.data.creatorId == request.auth.uid;
+
+      // Members can update (join/leave), admins can update group details
+      allow update: if isSignedIn() && (
+          // Admins can update anything
+          request.auth.uid in resource.data.adminIds ||
+          // Anyone can join (add themselves to memberIds)
+          (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['memberIds', 'currentMemberCount', 'lastActivityAt']))
+      );
+
+      // Only creator can delete
+      allow delete: if isSignedIn() && resource.data.creatorId == request.auth.uid;
+
+      // Group sessions subcollection
+      match /sessions/{sessionId} {
+        allow read: if isSignedIn();
+        allow create: if isSignedIn() &&
+            request.auth.uid in get(/databases/$(database)/documents/groups/$(groupId)).data.adminIds;
+        allow update: if isSignedIn();
+        allow delete: if isSignedIn() &&
+            request.auth.uid in get(/databases/$(database)/documents/groups/$(groupId)).data.adminIds;
+      }
+
+      // Group messages/posts subcollection
+      match /messages/{messageId} {
+        allow read: if isSignedIn();
+        allow create: if isSignedIn() &&
+            request.auth.uid in get(/databases/$(database)/documents/groups/$(groupId)).data.memberIds;
+        allow update, delete: if isSignedIn() && resource.data.userId == request.auth.uid;
+      }
+    }
+
+    // === ADVERTISING PLATFORM ===
+
+    // Ad Campaigns - only authenticated business users can create/edit their own
+    match /ad_campaigns/{campaignId} {
+      allow read: if isSignedIn();
+      allow create: if isValidUser() &&
+          request.resource.data.businessId == request.auth.uid;
+      allow update, delete: if isSignedIn() &&
+          resource.data.businessId == request.auth.uid;
+    }
+
+    // Ad Impressions - only functions can write
+    match /ad_impressions/{impressionId} {
+      allow read: if isSignedIn();
+      allow write: if false; // Only Cloud Functions can write
+    }
+
+    // Ad Clicks - only functions can write
+    match /ad_clicks/{clickId} {
+      allow read: if isSignedIn();
+      allow write: if false; // Only Cloud Functions can write
+    }
+
+    // Ad Payments - business can read their own
+    match /ad_payments/{paymentId} {
+      allow read: if isSignedIn() &&
+          resource.data.businessId == request.auth.uid;
+      allow write: if false; // Only Cloud Functions can write
+    }
+
+    // === VERSE NOTES ===
+    match /verseNotes/{noteId} {
+      allow read: if isSignedIn() && resource.data.userId == request.auth.uid;
+      allow create: if isValidUser() &&
+          request.resource.data.userId == request.auth.uid;
+      allow update, delete: if isSignedIn() && resource.data.userId == request.auth.uid;
+    }
+
+    // === VERSE ANNOTATIONS (Community Bible Study - "Genius for Bible") ===
+
+    // Main annotations collection (nested under verse IDs)
+    match /verseAnnotations/{verseId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn(); // Allow users to create verse meta when adding first annotation
+      allow update: if isSignedIn(); // Allow updates for count tracking
+
+      // Individual annotations (insights, questions, answers, cross-refs)
+      match /annotations/{annotationId} {
+        allow read: if isSignedIn();
+        allow create: if isSignedIn() &&
+            request.resource.data.userId == request.auth.uid;
+        allow update: if isSignedIn() && (
+            resource.data.userId == request.auth.uid || // Owner can edit
+            request.resource.data.keys().hasOnly(['upvotes', 'downvotes', 'score', 'answerCount']) // Anyone can vote
+        );
+        allow delete: if isSignedIn() && resource.data.userId == request.auth.uid;
+      }
+    }
+
+    // User votes on annotations (to prevent double voting)
+    match /userVotes/{odcId} {
+      allow read: if isSignedIn();
+      allow create: if isValidUser() &&
+          request.resource.data.userId == request.auth.uid;
+      allow update: if isSignedIn() && resource.data.userId == request.auth.uid;
+      allow delete: if isSignedIn() && resource.data.userId == request.auth.uid;
+    }
+
+    // Annotation reports (for moderation)
+    match /annotationReports/{reportId} {
+      allow read: if false; // Only admins via backend
+      allow create: if isValidUser() &&
+          request.resource.data.reporterId == request.auth.uid;
+      allow update, delete: if false; // Only admins
+    }
+
+    // Scholar badges (earned through quality contributions)
+    match /scholarBadges/{badgeId} {
+      allow read: if isSignedIn();
+      allow write: if false; // Only Cloud Functions can award badges
+    }
+
+    // User annotations index (for "My Contributions" tab)
+    match /userAnnotations/{userId} {
+      allow read: if isSignedIn();
+      allow write: if isOwner(userId); // Allow users to track their own contributions
+
+      match /contributions/{contributionId} {
+        allow read: if isSignedIn();
+        allow write: if isOwner(userId); // Allow users to add their own contributions
+      }
+    }
+
+    // Faith Score history (track points earned from annotations)
+    match /faithScoreHistory/{historyId} {
+      allow read: if isSignedIn() && resource.data.userId == request.auth.uid;
+      allow write: if false; // Only Cloud Functions
+    }
+
+    // Badge check queue (for async badge processing)
+    match /badgeCheckQueue/{queueId} {
+      allow read, write: if false; // Only Cloud Functions
+    }
+
+    // === ADMIN ONLY ===
+    match /analytics/{document=**} {
+      allow read, write: if false; // Only via Admin SDK
+    }
+
+    // Catch-all: Deny everything else
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
