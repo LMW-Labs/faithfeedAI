@@ -44,7 +44,7 @@ fun PrayerWallScreen(
         containerColor = FaithFeedColors.BackgroundPrimary,
         topBar = {
             FaithFeedTopBar(
-                title = "Prayer Wall",
+                title = "The Wall",
                 onSearchClick = { navController.navigate(Route.SemanticSearch) },
                 onNotificationsClick = { navController.navigate(Route.Notifications) },
                 onProfileClick = {

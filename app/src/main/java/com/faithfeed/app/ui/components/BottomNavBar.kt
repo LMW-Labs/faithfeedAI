@@ -52,7 +52,7 @@ private val navItems = listOf(
     NavItem(Route.BibleReader, "Bible", Icons.Filled.AutoStories, Icons.Outlined.AutoStories),
     NavItem(Route.Explore, "Explore", Icons.Filled.Explore, Icons.Outlined.Explore),
     NavItem(Route.Marketplace, "Exchange", Icons.Filled.Storefront, Icons.Outlined.Storefront),
-    NavItem(Route.PrayerWall, "Prayer", Icons.Filled.VolunteerActivism, Icons.Outlined.VolunteerActivism)
+    NavItem(Route.PrayerWall, "The Wall", Icons.Filled.VolunteerActivism, Icons.Outlined.VolunteerActivism)
 )
 
 @Composable
