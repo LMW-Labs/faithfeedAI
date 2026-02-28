@@ -5,16 +5,18 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.Psychology
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.Image
 import androidx.compose.material3.FloatingActionButton
-import androidx.compose.material3.Icon
+import androidx.compose.ui.res.painterResource
+import com.faithfeed.app.R
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavDestination
@@ -76,7 +78,11 @@ fun MainScreen(
                     containerColor = FaithFeedColors.GoldAccent,
                     contentColor = FaithFeedColors.BackgroundPrimary
                 ) {
-                    Icon(Icons.Outlined.Psychology, contentDescription = "AI Study Partner")
+                    Image(
+                        painter = painterResource(R.drawable.negspace_omega),
+                        contentDescription = "AI Study Partner",
+                        modifier = Modifier.size(28.dp)
+                    )
                 }
             }
         },
