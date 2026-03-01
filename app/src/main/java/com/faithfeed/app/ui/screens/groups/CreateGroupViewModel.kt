@@ -29,14 +29,20 @@ class CreateGroupViewModel @Inject constructor(
     private val _error = MutableStateFlow<String?>(null)
     val error: StateFlow<String?> = _error.asStateFlow()
 
-    fun onNameChange(v: String) { _name.value = v }
+    fun onNameChange(v: String) { _name.value = v; _error.value = null }
     fun onDescriptionChange(v: String) { _description.value = v }
     fun onPrivacyChange(v: Boolean) { _isPrivate.value = v }
 
     fun createGroup(onSuccess: (String) -> Unit) {
+        if (_name.value.isBlank()) {
+            _error.value = "Group name is required"
+            return
+        }
         viewModelScope.launch {
             _isSubmitting.value = true
-            // TODO: call groupRepository.createGroup(name, description, isPrivate)
+            groupRepository.createGroup(_name.value.trim(), _description.value.trim(), _isPrivate.value)
+                .onSuccess { group -> onSuccess(group.id) }
+                .onFailure { _error.value = it.message ?: "Failed to create group" }
             _isSubmitting.value = false
         }
     }

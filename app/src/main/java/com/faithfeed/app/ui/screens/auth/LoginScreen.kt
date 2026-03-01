@@ -1,5 +1,7 @@
 package com.faithfeed.app.ui.screens.auth
 
+import android.net.Uri
+import androidx.browser.customtabs.CustomTabsIntent
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -24,20 +26,26 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Email
 import androidx.compose.material.icons.outlined.Lock
+import androidx.compose.material.icons.outlined.Phone
 import androidx.compose.material.icons.outlined.Visibility
 import androidx.compose.material.icons.outlined.VisibilityOff
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusDirection
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
@@ -48,8 +56,12 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.credentials.CredentialManager
+import androidx.credentials.GetCredentialRequest
+import androidx.credentials.exceptions.GetCredentialException
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.faithfeed.app.BuildConfig
 import com.faithfeed.app.R
 import com.faithfeed.app.ui.components.ButtonStyle
 import com.faithfeed.app.ui.components.FaithFeedButton
@@ -59,16 +71,31 @@ import com.faithfeed.app.ui.theme.FaithFeedColors
 import com.faithfeed.app.ui.theme.FaithFeedGradients
 import com.faithfeed.app.ui.theme.Nunito
 import com.faithfeed.app.ui.theme.Typography
+import com.google.android.libraries.identity.googleid.GetGoogleIdOption
+import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
+import kotlinx.coroutines.launch
 
 @Composable
 fun LoginScreen(
     onLoginSuccess: (Boolean) -> Unit,
     onNavigateToSignUp: () -> Unit,
     onNavigateToForgotPassword: () -> Unit,
+    onNavigateToPhoneLogin: () -> Unit = {},
     viewModel: LoginViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val focusManager = LocalFocusManager.current
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+
+    // Collect nav events from OAuth callbacks (Facebook etc.)
+    LaunchedEffect(viewModel) {
+        viewModel.navEvents.collect { event ->
+            when (event) {
+                is LoginNavEvent.LoginSuccess -> onLoginSuccess(event.needsSetup)
+            }
+        }
+    }
 
     Box(
         modifier = Modifier
@@ -210,6 +237,85 @@ fun LoginScreen(
                                 onClick = { viewModel.signIn(onLoginSuccess) },
                                 modifier = Modifier.fillMaxWidth(),
                                 style = ButtonStyle.Primary
+                            )
+                        }
+                    }
+
+                    Spacer(Modifier.height(16.dp))
+                    HorizontalDivider(color = FaithFeedColors.GlassBorder)
+                    Spacer(Modifier.height(16.dp))
+
+                    // Google Sign-In button
+                    OutlinedButton(
+                        onClick = {
+                            scope.launch {
+                                try {
+                                    val cm = CredentialManager.create(context)
+                                    val option = GetGoogleIdOption.Builder()
+                                        .setFilterByAuthorizedAccounts(false)
+                                        .setServerClientId(BuildConfig.GOOGLE_WEB_CLIENT_ID)
+                                        .build()
+                                    val result = cm.getCredential(
+                                        context,
+                                        GetCredentialRequest.Builder()
+                                            .addCredentialOption(option)
+                                            .build()
+                                    )
+                                    val idToken = GoogleIdTokenCredential
+                                        .createFrom(result.credential.data).idToken
+                                    viewModel.signInWithGoogle(idToken, onLoginSuccess)
+                                } catch (_: GetCredentialException) {
+                                    // User cancelled or no accounts — silent fail
+                                }
+                            }
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(16.dp),
+                        border = androidx.compose.foundation.BorderStroke(
+                            1.dp, FaithFeedColors.GlassBorder
+                        )
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.Center
+                        ) {
+                            Text(
+                                text = "G  Continue with Google",
+                                fontFamily = Nunito,
+                                fontWeight = FontWeight.SemiBold,
+                                fontSize = 14.sp,
+                                color = FaithFeedColors.TextPrimary
+                            )
+                        }
+                    }
+
+                    Spacer(Modifier.height(12.dp))
+
+                    // Facebook Sign-In button (browser OAuth)
+                    OutlinedButton(
+                        onClick = {
+                            try {
+                                val url = viewModel.getFacebookSignInUrl()
+                                CustomTabsIntent.Builder().build()
+                                    .launchUrl(context, Uri.parse(url))
+                            } catch (_: Exception) { /* no-op */ }
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(16.dp),
+                        border = androidx.compose.foundation.BorderStroke(
+                            1.dp, FaithFeedColors.GlassBorder
+                        )
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.Center
+                        ) {
+                            Text(
+                                text = "f  Continue with Facebook",
+                                fontFamily = Nunito,
+                                fontWeight = FontWeight.SemiBold,
+                                fontSize = 14.sp,
+                                color = FaithFeedColors.TextPrimary
                             )
                         }
                     }

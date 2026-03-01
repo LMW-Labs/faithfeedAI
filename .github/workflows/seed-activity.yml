@@ -1,0 +1,28 @@
+name: Seed Activity
+
+on:
+  schedule:
+    - cron: '0 8 * * *'    # 8:00 AM UTC  (~3am ET / midnight PT)
+    - cron: '30 13 * * *'  # 1:30 PM UTC  (~8:30am ET / 5:30am PT)
+    - cron: '0 20 * * *'   # 8:00 PM UTC  (~3pm ET / noon PT)
+  workflow_dispatch:        # manual trigger for testing
+
+jobs:
+  run-activity:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: pip install supabase
+
+      - name: Run seed activity
+        env:
+          SUPABASE_URL:         ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+        run: python scripts/daily_activity.py

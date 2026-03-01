@@ -2,6 +2,7 @@ package com.faithfeed.app.ui.screens.explore
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.faithfeed.app.data.repository.AILibraryRepository
 import com.faithfeed.app.data.repository.AIRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -12,11 +13,12 @@ import javax.inject.Inject
 
 @HiltViewModel
 class DevotionalGeneratorViewModel @Inject constructor(
-    private val aiRepository: AIRepository
+    private val aiRepository: AIRepository,
+    private val aiLibraryRepository: AILibraryRepository
 ) : ViewModel() {
     private val _devotional = MutableStateFlow("")
     val devotional: StateFlow<String> = _devotional.asStateFlow()
-    
+
     private val _isLoading = MutableStateFlow(false)
     val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
 
@@ -25,13 +27,13 @@ class DevotionalGeneratorViewModel @Inject constructor(
         _isLoading.value = true
         _devotional.value = ""
         viewModelScope.launch {
-            // using a mock verseRef and verseText for now
             val result = aiRepository.generateDevotional(
-                verseRef = "Proverbs 3:5-6", 
+                verseRef = topic,
                 verseText = topic
             )
-            result.onSuccess { 
-                _devotional.value = it
+            result.onSuccess { content ->
+                _devotional.value = content
+                aiLibraryRepository.saveInteraction("devotional", "Devotional: $topic", content)
             }
             _isLoading.value = false
         }

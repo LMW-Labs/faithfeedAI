@@ -5,6 +5,7 @@ import androidx.room.Room
 import com.faithfeed.app.data.local.FaithFeedDatabase
 import com.faithfeed.app.data.local.dao.BibleVerseDao
 import com.faithfeed.app.data.local.dao.DraftPostDao
+import com.faithfeed.app.data.local.dao.VerseHighlightDao
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -23,11 +24,14 @@ object DatabaseModule {
             context,
             FaithFeedDatabase::class.java,
             "faithfeed.db"
-        ).build()
+        ).fallbackToDestructiveMigration().build()
 
     @Provides
     fun provideBibleVerseDao(db: FaithFeedDatabase): BibleVerseDao = db.bibleVerseDao()
 
     @Provides
     fun provideDraftPostDao(db: FaithFeedDatabase): DraftPostDao = db.draftPostDao()
+
+    @Provides
+    fun provideVerseHighlightDao(db: FaithFeedDatabase): VerseHighlightDao = db.verseHighlightDao()
 }

@@ -49,6 +49,7 @@ class PrayerRepositoryImpl @Inject constructor(
                 val initial = supabase.from("prayer_requests")
                     .select(Columns.raw("*, author:profiles(id,full_name,username,avatar_url)")) {
                         filter { eq("is_answered", false) }
+                        order("prayer_count", Order.DESCENDING)
                         order("created_at", Order.DESCENDING)
                         limit(50)
                     }.decodeList<PrayerRequest>()

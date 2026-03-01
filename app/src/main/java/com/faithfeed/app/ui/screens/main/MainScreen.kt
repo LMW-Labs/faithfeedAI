@@ -7,7 +7,9 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.Image
-import androidx.compose.material3.FloatingActionButton
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material3.Surface
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import com.faithfeed.app.R
 import androidx.compose.material3.Scaffold
@@ -15,6 +17,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -73,16 +76,24 @@ fun MainScreen(
         contentWindowInsets = WindowInsets(0),
         floatingActionButton = {
             if (showBottomBar) {
-                FloatingActionButton(
+                Surface(
                     onClick = { innerNavController.navigate(Route.AIStudyPartner) },
-                    containerColor = FaithFeedColors.GoldAccent,
-                    contentColor = FaithFeedColors.BackgroundPrimary
+                    modifier = Modifier.size(56.dp),
+                    shape = CircleShape,
+                    color = Color.Black,
+                    shadowElevation = 6.dp,
+                    tonalElevation = 0.dp
                 ) {
-                    Image(
-                        painter = painterResource(R.drawable.negspace_omega),
-                        contentDescription = "AI Study Partner",
-                        modifier = Modifier.size(28.dp)
-                    )
+                    Box(
+                        contentAlignment = Alignment.Center,
+                        modifier = Modifier.fillMaxSize()
+                    ) {
+                        Image(
+                            painter = painterResource(R.drawable.negspace_omega),
+                            contentDescription = "AI Study Partner",
+                            modifier = Modifier.size(34.dp)
+                        )
+                    }
                 }
             }
         },

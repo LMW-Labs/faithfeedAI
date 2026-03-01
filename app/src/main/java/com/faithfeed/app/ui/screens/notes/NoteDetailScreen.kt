@@ -26,10 +26,11 @@ import com.faithfeed.app.ui.theme.Typography
 @Composable
 fun NoteDetailScreen(
     noteId: String,
+    prefilledVerseRef: String = "",
     navController: NavController,
     viewModel: NoteDetailViewModel = hiltViewModel()
 ) {
-    LaunchedEffect(noteId) { viewModel.init(noteId) }
+    LaunchedEffect(noteId) { viewModel.init(noteId, prefilledVerseRef) }
 
     val title by viewModel.title.collectAsStateWithLifecycle()
     val content by viewModel.content.collectAsStateWithLifecycle()
@@ -166,10 +167,11 @@ fun NoteDetailScreen(
             Spacer(Modifier.height(8.dp))
 
             FaithFeedButton(
-                text = "Save Note",
-                onClick = { viewModel.save { navController.popBackStack() } },
+                text = if (isSaving) "Saving..." else "Save Note",
+                onClick = { if (!isSaving) viewModel.save { navController.popBackStack() } },
                 style = ButtonStyle.Primary,
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier.fillMaxWidth(),
+                enabled = !isSaving
             )
 
             Spacer(Modifier.height(32.dp))

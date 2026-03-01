@@ -32,9 +32,17 @@ class NotificationRepositoryImpl @Inject constructor(
      */
     override fun getNotificationsFlow(): Flow<List<Notification>> = flow {
         val uid = currentUserId() ?: run { emit(emptyList()); return@flow }
+        // Try with actor join (if actor_id FK exists), fall back to plain query
         val result = runCatching {
             supabase.from("notifications")
                 .select(Columns.raw("*, actor:profiles!actor_id(id,full_name,username,avatar_url)")) {
+                    filter { eq("user_id", uid) }
+                    order("created_at", Order.DESCENDING)
+                    limit(50)
+                }.decodeList<Notification>()
+        }.recoverCatching {
+            supabase.from("notifications")
+                .select(Columns.raw("*")) {
                     filter { eq("user_id", uid) }
                     order("created_at", Order.DESCENDING)
                     limit(50)

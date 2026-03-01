@@ -141,9 +141,9 @@ object MockData {
     )
 
     val bibleVerses = listOf(
-        com.faithfeed.app.data.model.BibleVerse(id = 1, book = "Genesis", chapter = 1, verse = 1, text = "In the beginning God created the heavens and the earth.", testament = "OT", bookOrder = 1),
-        com.faithfeed.app.data.model.BibleVerse(id = 2, book = "Genesis", chapter = 1, verse = 2, text = "And the earth was waste and void; and darkness was upon the face of the deep: and the Spirit of God moved upon the face of the waters.", testament = "OT", bookOrder = 1),
-        com.faithfeed.app.data.model.BibleVerse(id = 3, book = "Genesis", chapter = 1, verse = 3, text = "And God said, Let there be light: and there was light.", testament = "OT", bookOrder = 1),
-        com.faithfeed.app.data.model.BibleVerse(id = 4, book = "John", chapter = 3, verse = 16, text = "For God so loved the world, that he gave his only begotten Son, that whosoever believeth on him should not perish, but have eternal life.", testament = "NT", bookOrder = 43)
+        com.faithfeed.app.data.model.BibleVerse(id = 1, book = "Genesis", chapter = 1, verse = 1, text = "In the beginning God created the heavens and the earth."),
+        com.faithfeed.app.data.model.BibleVerse(id = 2, book = "Genesis", chapter = 1, verse = 2, text = "And the earth was waste and void; and darkness was upon the face of the deep: and the Spirit of God moved upon the face of the waters."),
+        com.faithfeed.app.data.model.BibleVerse(id = 3, book = "Genesis", chapter = 1, verse = 3, text = "And God said, Let there be light: and there was light."),
+        com.faithfeed.app.data.model.BibleVerse(id = 4, book = "John", chapter = 3, verse = 16, text = "For God so loved the world, that he gave his only begotten Son, that whosoever believeth on him should not perish, but have eternal life.")
     )
 }

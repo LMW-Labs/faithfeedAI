@@ -1,5 +1,9 @@
 package com.faithfeed.app.di
 
+import com.faithfeed.app.data.repository.AILibraryRepository
+import com.faithfeed.app.data.repository.AILibraryRepositoryImpl
+import com.faithfeed.app.data.repository.ConcordanceRepository
+import com.faithfeed.app.data.repository.ConcordanceRepositoryImpl
 import com.faithfeed.app.data.repository.AIRepository
 import com.faithfeed.app.data.repository.AIRepositoryImpl
 import com.faithfeed.app.data.repository.AuthRepository
@@ -69,4 +73,10 @@ abstract class RepositoryModule {
 
     @Binds @Singleton
     abstract fun bindBusinessPageRepository(impl: BusinessPageRepositoryImpl): BusinessPageRepository
+
+    @Binds @Singleton
+    abstract fun bindAILibraryRepository(impl: AILibraryRepositoryImpl): AILibraryRepository
+
+    @Binds @Singleton
+    abstract fun bindConcordanceRepository(impl: ConcordanceRepositoryImpl): ConcordanceRepository
 }

@@ -17,6 +17,8 @@ sealed class Route {
     @Serializable data object Login : Route()
     @Serializable data object SignUp : Route()
     @Serializable data object ForgotPassword : Route()
+    @Serializable data object PhoneLogin : Route()
+    @Serializable data class VerifyOtp(val phone: String) : Route()
 
     // ── Main shell (hosts inner NavHost + BottomNavBar) ────────────────────
     @Serializable data class Main(val needsProfileSetup: Boolean = false) : Route()
@@ -37,6 +39,8 @@ sealed class Route {
     @Serializable data object CreateStory : Route()
 
     // ── Bible / AI tools ───────────────────────────────────────────────────
+    @Serializable data class BibleChapter(val book: String, val chapter: Int) : Route()
+    @Serializable data class ConcordanceResults(val strongsTag: String) : Route()
     @Serializable data object SemanticSearch : Route()
     @Serializable data object AIStudyPartner : Route()
     @Serializable data object ChapterSummarizer : Route()
@@ -73,7 +77,7 @@ sealed class Route {
 
     // ── Notes ──────────────────────────────────────────────────────────────
     @Serializable data object Notes : Route()
-    @Serializable data class NoteDetail(val noteId: String) : Route()
+    @Serializable data class NoteDetail(val noteId: String, val prefilledVerseRef: String = "") : Route()
 
     // ── Marketplace ────────────────────────────────────────────────────────
     @Serializable data class MarketplaceDetail(val itemId: String) : Route()

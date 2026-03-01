@@ -13,9 +13,25 @@ import io.github.jan.supabase.postgrest.postgrest
 import io.github.jan.supabase.postgrest.query.Columns
 import io.github.jan.supabase.postgrest.query.Order
 import kotlinx.coroutines.flow.Flow
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import javax.inject.Inject
+
+@Serializable
+private data class PostPrayData(
+    val id: String = "",
+    @SerialName("user_id") val userId: String = "",
+    val content: String = "",
+    @SerialName("verse_ref") val verseRef: String? = null,
+    val author: PostAuthorPrivacy? = null
+)
+
+@Serializable
+private data class PostAuthorPrivacy(
+    @SerialName("is_private") val isPrivate: Boolean = false
+)
 
 interface PostRepository {
     fun getFeedPager(): Flow<PagingData<Post>>
@@ -26,6 +42,7 @@ interface PostRepository {
     suspend fun prayPost(postId: String): Result<Unit>
     suspend fun deletePost(postId: String): Result<Unit>
     suspend fun getPostsByUser(userId: String): Result<List<Post>>
+    suspend fun sharePost(postId: String): Result<Unit>
     suspend fun getComments(postId: String): Result<List<Comment>>
     suspend fun addComment(postId: String, content: String): Result<Comment>
 }
@@ -71,6 +88,15 @@ class PostRepositoryImpl @Inject constructor(
         val post = supabase.from("posts").insert(body) {
             select(Columns.raw("*, author:profiles(id,full_name,username,avatar_url,is_verified)"))
         }.decodeSingle<Post>()
+        // LFS event: verse share scores higher than a plain post
+        val eventType = if (verseRef != null) "verse_share" else "post"
+        val points = if (verseRef != null) 7 else 3
+        supabase.from("lfs_events").insert(buildJsonObject {
+            put("post_id", post.id)
+            put("user_id", userId)
+            put("event_type", eventType)
+            put("points", points)
+        })
         Result.success(post)
     } catch (e: Exception) {
         Result.failure(e)
@@ -115,14 +141,50 @@ class PostRepositoryImpl @Inject constructor(
             put("event_type", "prayer")
             put("points", 10)
         })
-        // Increment prayer_count on the post — best-effort RPC call
-        supabase.postgrest.rpc("increment_prayer_count", buildJsonObject {
-            put("p_post_id", postId)
-        })
+        // Increment prayer_count on the post
+        try {
+            supabase.postgrest.rpc("increment_prayer_count", buildJsonObject {
+                put("p_post_id", postId)
+            })
+        } catch (_: Exception) {}
+
+        // Cross-post to Prayer Wall for public/community profiles only
+        try {
+            val post = supabase.from("posts")
+                .select(Columns.raw("id,user_id,content,verse_ref,author:profiles!user_id(is_private)")) {
+                    filter { eq("id", postId) }
+                    limit(1)
+                }.decodeSingleOrNull<PostPrayData>()
+
+            if (post != null && post.author?.isPrivate == false) {
+                val postIdLong = postId.toLongOrNull()
+                if (postIdLong != null) {
+                    val title = post.content.take(80).trimEnd().let {
+                        if (post.content.length > 80) "$it…" else it
+                    }
+                    // Create prayer_request if not already cross-posted from this post
+                    supabase.from("prayer_requests").upsert(
+                        buildJsonObject {
+                            put("user_id", post.userId)
+                            put("title", title)
+                            put("content", post.content)
+                            put("origin_post_id", postIdLong)
+                        }
+                    ) {
+                        onConflict = "origin_post_id"
+                        ignoreDuplicates = true
+                    }
+                    // Increment prayer_count on the prayer_request entry
+                    supabase.postgrest.rpc("increment_prayer_count_by_origin", buildJsonObject {
+                        put("p_post_id", postIdLong)
+                    })
+                }
+            }
+        } catch (_: Exception) { /* best-effort cross-post */ }
+
         Result.success(Unit)
     } catch (e: Exception) {
-        // Non-fatal — prayer count update is best-effort
-        Result.success(Unit)
+        Result.success(Unit) // prayer is non-fatal
     }
 
     override suspend fun deletePost(postId: String): Result<Unit> = try {
@@ -145,6 +207,25 @@ class PostRepositoryImpl @Inject constructor(
         Result.failure(e)
     }
 
+    override suspend fun sharePost(postId: String): Result<Unit> = try {
+        val userId = currentUserId() ?: return Result.failure(Exception("Not authenticated"))
+        supabase.from("lfs_events").insert(buildJsonObject {
+            put("post_id", postId)
+            put("user_id", userId)
+            put("event_type", "share")
+            put("points", 5)
+        })
+        // Best-effort counter increment — same pattern as prayer count
+        try {
+            supabase.postgrest.rpc("increment_share_count", buildJsonObject {
+                put("p_post_id", postId)
+            })
+        } catch (_: Exception) { }
+        Result.success(Unit)
+    } catch (e: Exception) {
+        Result.success(Unit) // non-fatal — share sheet already opened
+    }
+
     override suspend fun getComments(postId: String): Result<List<Comment>> = try {
         val comments = supabase.from("post_comments")
             .select(Columns.raw("*, author:profiles(id,full_name,username,avatar_url)")) {
@@ -165,6 +246,13 @@ class PostRepositoryImpl @Inject constructor(
         }) {
             select(Columns.raw("*, author:profiles(id,full_name,username,avatar_url)"))
         }.decodeSingle<Comment>()
+        // LFS event: comments are worth +7
+        supabase.from("lfs_events").insert(buildJsonObject {
+            put("post_id", postId)
+            put("user_id", userId)
+            put("event_type", "comment")
+            put("points", 7)
+        })
         Result.success(comment)
     } catch (e: Exception) {
         Result.failure(e)

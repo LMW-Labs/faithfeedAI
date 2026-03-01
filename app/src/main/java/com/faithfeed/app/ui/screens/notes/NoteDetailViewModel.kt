@@ -50,10 +50,12 @@ class NoteDetailViewModel @Inject constructor(
     private val _error = MutableStateFlow<String?>(null)
     val error: StateFlow<String?> = _error.asStateFlow()
 
-    fun init(noteId: String) {
+    fun init(noteId: String, prefilledVerseRef: String = "") {
         _noteId.value = noteId
         _isNewNote.value = noteId == "new"
-        if (noteId != "new") {
+        if (noteId == "new") {
+            if (prefilledVerseRef.isNotBlank()) _verseRef.value = prefilledVerseRef
+        } else {
             viewModelScope.launch {
                 note.collect { existingNote ->
                     if (existingNote != null && _title.value.isEmpty()) {

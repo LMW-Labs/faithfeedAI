@@ -16,5 +16,6 @@ data class PrayerRequest(
     @SerialName("is_answered") val isAnswered: Boolean = false,
     @SerialName("created_at") val createdAt: String = "",
     val author: User? = null,
-    @SerialName("has_prayed") val hasPrayed: Boolean = false
+    @SerialName("has_prayed") val hasPrayed: Boolean = false,
+    @SerialName("origin_post_id") val originPostId: Long? = null
 )

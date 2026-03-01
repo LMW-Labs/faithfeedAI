@@ -7,13 +7,15 @@ import androidx.navigation.compose.composable
 import androidx.navigation.toRoute
 import com.faithfeed.app.ui.screens.auth.ForgotPasswordScreen
 import com.faithfeed.app.ui.screens.auth.LoginScreen
+import com.faithfeed.app.ui.screens.auth.PhoneLoginScreen
 import com.faithfeed.app.ui.screens.auth.SignUpScreen
+import com.faithfeed.app.ui.screens.auth.VerifyOtpScreen
 import com.faithfeed.app.ui.screens.main.MainScreen
 import com.faithfeed.app.ui.screens.splash.SplashScreen
 
 /**
  * Root NavHost — manages the top-level app graph:
- *  Splash → Auth (Login / SignUp / ForgotPassword) → Main
+ *  Splash → Auth (Login / SignUp / ForgotPassword / PhoneLogin / VerifyOtp) → Main
  *
  * All in-app navigation (feed, bible, chat, profile, etc.) lives inside
  * MainScreen's inner NavHost (MainNavGraph.kt).
@@ -49,7 +51,8 @@ fun RootNavGraph(rootNavController: NavHostController) {
                     }
                 },
                 onNavigateToSignUp = { rootNavController.navigate(Route.SignUp) },
-                onNavigateToForgotPassword = { rootNavController.navigate(Route.ForgotPassword) }
+                onNavigateToForgotPassword = { rootNavController.navigate(Route.ForgotPassword) },
+                onNavigateToPhoneLogin = { rootNavController.navigate(Route.PhoneLogin) }
             )
         }
 
@@ -66,6 +69,28 @@ fun RootNavGraph(rootNavController: NavHostController) {
 
         composable<Route.ForgotPassword> {
             ForgotPasswordScreen(
+                onBack = { rootNavController.popBackStack() }
+            )
+        }
+
+        composable<Route.PhoneLogin> {
+            PhoneLoginScreen(
+                onCodeSent = { phone ->
+                    rootNavController.navigate(Route.VerifyOtp(phone))
+                },
+                onBack = { rootNavController.popBackStack() }
+            )
+        }
+
+        composable<Route.VerifyOtp> { entry ->
+            val route = entry.toRoute<Route.VerifyOtp>()
+            VerifyOtpScreen(
+                phone = route.phone,
+                onVerified = { needsSetup ->
+                    rootNavController.navigate(Route.Main(needsProfileSetup = needsSetup)) {
+                        popUpTo<Route.Login> { inclusive = true }
+                    }
+                },
                 onBack = { rootNavController.popBackStack() }
             )
         }

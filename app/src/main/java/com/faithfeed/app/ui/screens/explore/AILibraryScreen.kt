@@ -2,53 +2,70 @@ package com.faithfeed.app.ui.screens.explore
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.*
-import androidx.compose.material3.*
+import androidx.compose.material.icons.outlined.AutoAwesome
+import androidx.compose.material.icons.outlined.CalendarMonth
+import androidx.compose.material.icons.outlined.Delete
+import androidx.compose.material.icons.outlined.LibraryBooks
+import androidx.compose.material.icons.outlined.Summarize
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.ScrollableTabRow
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Tab
+import androidx.compose.material3.TabRowDefaults
 import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
-import androidx.compose.runtime.*
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
+import com.faithfeed.app.data.model.AIInteraction
 import com.faithfeed.app.ui.components.EmptyState
 import com.faithfeed.app.ui.components.SimpleTopBar
 import com.faithfeed.app.ui.theme.FaithFeedColors
 import com.faithfeed.app.ui.theme.Typography
 
-data class SavedAILibraryItem(
-    val id: String,
-    val type: String, // "devotional", "summary", "plan"
-    val title: String,
-    val date: String,
-    val previewText: String
+private val FILTERS = listOf(
+    "All" to "all",
+    "Devotionals" to "devotional",
+    "Summaries" to "summary",
+    "Plans" to "study_plan"
 )
 
 @Composable
-fun AILibraryScreen(navController: NavController) {
-    var selectedFilter by remember { mutableStateOf("All") }
-    val filters = listOf("All", "Devotionals", "Summaries", "Plans")
+fun AILibraryScreen(
+    navController: NavController,
+    viewModel: AILibraryViewModel = hiltViewModel()
+) {
+    val currentFilter by viewModel.filter.collectAsStateWithLifecycle()
+    val filteredItems by viewModel.filtered.collectAsStateWithLifecycle()
 
-    // Mock data to show the UI
-    val savedItems = listOf(
-        SavedAILibraryItem("1", "devotional", "Devotional: Trusting God", "Oct 12, 2024", "Today's devotional focuses on Proverbs 3:5-6. In our busy lives..."),
-        SavedAILibraryItem("2", "summary", "Summary: Genesis Chapter 1", "Oct 10, 2024", "This chapter covers the beginning of creation. God speaks the universe..."),
-        SavedAILibraryItem("3", "plan", "7-Day Plan: Leadership in the Bible", "Oct 05, 2024", "Day 1: David's Heart. Read 1 Samuel 16:7 and reflect on...")
-    )
-
-    val filteredItems = if (selectedFilter == "All") savedItems else savedItems.filter {
-        when (selectedFilter) {
-            "Devotionals" -> it.type == "devotional"
-            "Summaries" -> it.type == "summary"
-            "Plans" -> it.type == "plan"
-            else -> true
-        }
-    }
+    val selectedTabIndex = FILTERS.indexOfFirst { it.second == currentFilter }.coerceAtLeast(0)
 
     Scaffold(
         containerColor = FaithFeedColors.BackgroundPrimary,
@@ -61,33 +78,35 @@ fun AILibraryScreen(navController: NavController) {
                 .fillMaxSize()
                 .padding(paddingValues)
         ) {
-            // Filter Row
+            // Filter tabs
             Surface(
                 color = FaithFeedColors.BackgroundSecondary,
                 modifier = Modifier.fillMaxWidth()
             ) {
                 ScrollableTabRow(
-                    selectedTabIndex = filters.indexOf(selectedFilter),
+                    selectedTabIndex = selectedTabIndex,
                     containerColor = FaithFeedColors.BackgroundSecondary,
                     contentColor = FaithFeedColors.GoldAccent,
                     edgePadding = 16.dp,
                     indicator = { tabPositions ->
-                        val index = filters.indexOf(selectedFilter).takeIf { it >= 0 } ?: 0
-                        TabRowDefaults.SecondaryIndicator(
-                            Modifier.tabIndicatorOffset(tabPositions[index]),
-                            color = FaithFeedColors.GoldAccent
-                        )
+                        if (selectedTabIndex < tabPositions.size) {
+                            TabRowDefaults.SecondaryIndicator(
+                                Modifier.tabIndicatorOffset(tabPositions[selectedTabIndex]),
+                                color = FaithFeedColors.GoldAccent
+                            )
+                        }
                     }
                 ) {
-                    filters.forEach { filter ->
+                    FILTERS.forEachIndexed { index, (label, typeKey) ->
                         Tab(
-                            selected = selectedFilter == filter,
-                            onClick = { selectedFilter = filter },
-                            text = { 
+                            selected = selectedTabIndex == index,
+                            onClick = { viewModel.setFilter(typeKey) },
+                            text = {
                                 Text(
-                                    filter, 
-                                    color = if (selectedFilter == filter) FaithFeedColors.GoldAccent else FaithFeedColors.TextSecondary 
-                                ) 
+                                    label,
+                                    color = if (selectedTabIndex == index)
+                                        FaithFeedColors.GoldAccent else FaithFeedColors.TextSecondary
+                                )
                             }
                         )
                     }
@@ -99,7 +118,7 @@ fun AILibraryScreen(navController: NavController) {
                     EmptyState(
                         icon = Icons.Outlined.LibraryBooks,
                         title = "Library Empty",
-                        subtitle = "When you save AI generations, they will appear here."
+                        subtitle = "Generate a devotional, summary, or study plan to save it here."
                     )
                 } else {
                     LazyColumn(
@@ -108,7 +127,10 @@ fun AILibraryScreen(navController: NavController) {
                         verticalArrangement = Arrangement.spacedBy(16.dp)
                     ) {
                         items(filteredItems, key = { it.id }) { item ->
-                            LibraryItemCard(item = item, onClick = { /* TODO: Navigate to detail view */ })
+                            LibraryItemCard(
+                                item = item,
+                                onDelete = { viewModel.delete(item.id) }
+                            )
                         }
                     }
                 }
@@ -118,11 +140,23 @@ fun AILibraryScreen(navController: NavController) {
 }
 
 @Composable
-fun LibraryItemCard(item: SavedAILibraryItem, onClick: () -> Unit) {
+fun LibraryItemCard(item: AIInteraction, onDelete: () -> Unit) {
+    val typeLabel = when (item.type) {
+        "devotional" -> "Devotional"
+        "summary" -> "Summary"
+        "study_plan" -> "Study Plan"
+        else -> item.type.replaceFirstChar { it.uppercase() }
+    }
+    val typeIcon = when (item.type) {
+        "devotional" -> Icons.Outlined.AutoAwesome
+        "summary" -> Icons.Outlined.Summarize
+        "study_plan" -> Icons.Outlined.CalendarMonth
+        else -> Icons.Outlined.LibraryBooks
+    }
+    val dateDisplay = item.createdAt.take(10)
+
     Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable { onClick() },
+        modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(containerColor = FaithFeedColors.BackgroundSecondary),
         shape = RoundedCornerShape(12.dp)
     ) {
@@ -134,46 +168,51 @@ fun LibraryItemCard(item: SavedAILibraryItem, onClick: () -> Unit) {
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(
-                        imageVector = when (item.type) {
-                            "devotional" -> Icons.Outlined.AutoAwesome
-                            "summary" -> Icons.Outlined.Summarize
-                            "plan" -> Icons.Outlined.CalendarMonth
-                            else -> Icons.Outlined.LibraryBooks
-                        },
+                        imageVector = typeIcon,
                         contentDescription = null,
                         tint = FaithFeedColors.GoldAccent,
                         modifier = Modifier.size(20.dp)
                     )
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
-                        text = item.type.replaceFirstChar { it.uppercase() },
+                        text = typeLabel,
                         style = Typography.labelSmall.copy(fontWeight = FontWeight.Bold),
                         color = FaithFeedColors.GoldAccent
                     )
                 }
-                Text(
-                    text = item.date,
-                    style = Typography.bodySmall,
-                    color = FaithFeedColors.TextTertiary
-                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = dateDisplay,
+                        style = Typography.bodySmall,
+                        color = FaithFeedColors.TextTertiary
+                    )
+                    IconButton(onClick = onDelete, modifier = Modifier.size(32.dp)) {
+                        Icon(
+                            Icons.Outlined.Delete,
+                            contentDescription = "Delete",
+                            tint = FaithFeedColors.TextTertiary,
+                            modifier = Modifier.size(16.dp)
+                        )
+                    }
+                }
             }
-            
+
             Spacer(modifier = Modifier.height(12.dp))
-            
+
             Text(
                 text = item.title,
                 style = Typography.titleMedium.copy(fontWeight = FontWeight.Bold),
                 color = FaithFeedColors.TextPrimary
             )
-            
+
             Spacer(modifier = Modifier.height(4.dp))
-            
+
             Text(
-                text = item.previewText,
+                text = item.content,
                 style = Typography.bodyMedium,
                 color = FaithFeedColors.TextSecondary,
                 maxLines = 2,
-                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                overflow = TextOverflow.Ellipsis
             )
         }
     }

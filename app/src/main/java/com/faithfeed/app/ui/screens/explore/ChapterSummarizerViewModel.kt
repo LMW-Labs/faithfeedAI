@@ -2,6 +2,7 @@ package com.faithfeed.app.ui.screens.explore
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.faithfeed.app.data.repository.AILibraryRepository
 import com.faithfeed.app.data.repository.AIRepository
 import com.faithfeed.app.data.repository.BibleRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -20,7 +21,8 @@ import javax.inject.Inject
 @HiltViewModel
 class ChapterSummarizerViewModel @Inject constructor(
     private val aiRepository: AIRepository,
-    private val bibleRepository: BibleRepository
+    private val bibleRepository: BibleRepository,
+    private val aiLibraryRepository: AILibraryRepository
 ) : ViewModel() {
 
     private val _selectedBook = MutableStateFlow("Genesis")
@@ -68,7 +70,10 @@ class ChapterSummarizerViewModel @Inject constructor(
                 emptyList()
             }
             aiRepository.summarizeChapter(book, chapter, verses)
-                .onSuccess { _summary.value = it }
+                .onSuccess { content ->
+                    _summary.value = content
+                    aiLibraryRepository.saveInteraction("summary", "$book $chapter Summary", content)
+                }
             _isLoading.value = false
         }
     }

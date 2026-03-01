@@ -14,9 +14,9 @@ interface BibleVerseDao {
     fun getChapter(book: String, chapter: Int): Flow<List<BibleVerseEntity>>
 
     @Query("SELECT * FROM bible_verses WHERE id = :id")
-    suspend fun getById(id: Int): BibleVerseEntity?
+    suspend fun getById(id: Long): BibleVerseEntity?
 
-    @Query("SELECT DISTINCT book FROM bible_verses ORDER BY bookOrder ASC")
+    @Query("SELECT book FROM bible_verses GROUP BY book ORDER BY MIN(id) ASC")
     fun getAllBooks(): Flow<List<String>>
 
     @Query("SELECT DISTINCT chapter FROM bible_verses WHERE book = :book ORDER BY chapter ASC")

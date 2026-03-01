@@ -1,5 +1,6 @@
 package com.faithfeed.app.ui.screens.home
 
+import android.content.Intent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -19,6 +20,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
@@ -76,22 +78,21 @@ fun HomeScreen(
                 .padding(paddingValues),
             contentPadding = PaddingValues(bottom = 80.dp)
         ) {
-            // Daily verse card
+            // Stories Row — always shown; includes "Add Story" button as first item
+            item {
+                StoriesRow(
+                    stories = stories,
+                    onStoryClick = { story -> navController.navigate(Route.StoryViewer(story.userId)) },
+                    onAddStoryClick = { navController.navigate(Route.CreateStory) }
+                )
+            }
+
+            // Daily verse card — sits between stories and the feed
             if (dailyVerse != null) {
                 item {
                     DailyVerseCard(
                         dailyVerse = dailyVerse!!,
-                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)
-                    )
-                }
-            }
-
-            // Stories Row
-            if (stories.isNotEmpty()) {
-                item {
-                    StoriesRow(
-                        stories = stories,
-                        onStoryClick = { story -> navController.navigate(Route.StoryViewer(story.userId)) }
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
                     )
                 }
             }
@@ -106,7 +107,8 @@ fun HomeScreen(
                         onPostClick = { navController.navigate(Route.PostDetail(post.id)) },
                         onLikeClick = { viewModel.likePost(post.id) },
                         onPrayClick = { viewModel.prayPost(post.id) },
-                        onCommentClick = { navController.navigate(Route.PostDetail(post.id)) }
+                        onCommentClick = { navController.navigate(Route.PostDetail(post.id)) },
+                        onShareClick = { viewModel.sharePost(post.id) }
                     )
                 }
             }
@@ -210,7 +212,11 @@ private fun DailyVerseCard(dailyVerse: DailyVerse, modifier: Modifier = Modifier
 }
 
 @Composable
-fun StoriesRow(stories: List<Story>, onStoryClick: (Story) -> Unit) {
+fun StoriesRow(
+    stories: List<Story>,
+    onStoryClick: (Story) -> Unit,
+    onAddStoryClick: () -> Unit = {}
+) {
     LazyRow(
         modifier = Modifier
             .fillMaxWidth()
@@ -218,6 +224,40 @@ fun StoriesRow(stories: List<Story>, onStoryClick: (Story) -> Unit) {
         contentPadding = PaddingValues(horizontal = 16.dp),
         horizontalArrangement = Arrangement.spacedBy(12.dp)
     ) {
+        // Always-visible "Add Story" button
+        item {
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                modifier = Modifier
+                    .width(72.dp)
+                    .clickable { onAddStoryClick() }
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(64.dp)
+                        .clip(CircleShape)
+                        .border(2.dp, FaithFeedColors.GoldAccent.copy(alpha = 0.5f), CircleShape)
+                        .background(FaithFeedColors.GlassBackground),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = "+",
+                        fontSize = 28.sp,
+                        color = FaithFeedColors.GoldAccent,
+                        fontWeight = androidx.compose.ui.text.font.FontWeight.Light
+                    )
+                }
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = "Your Story",
+                    style = Typography.labelSmall,
+                    color = FaithFeedColors.TextSecondary,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+        }
+
         items(stories, key = { it.id }) { story ->
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
@@ -262,8 +302,10 @@ fun PostCard(
     onPostClick: () -> Unit,
     onLikeClick: () -> Unit = {},
     onPrayClick: () -> Unit = {},
-    onCommentClick: () -> Unit = {}
+    onCommentClick: () -> Unit = {},
+    onShareClick: () -> Unit = {}
 ) {
+    val context = LocalContext.current
     // Local optimistic state for immediate UI feedback before server round-trip
     var likeCount by remember(post.id) { mutableIntStateOf(post.likeCount) }
     var prayCount by remember(post.id) { mutableIntStateOf(post.prayerCount) }
@@ -398,7 +440,23 @@ fun PostCard(
                 PostActionButton(
                     icon = Icons.Outlined.Share,
                     label = "",
-                    onClick = { /* TODO: share sheet */ }
+                    onClick = {
+                        val text = buildString {
+                            append(post.content)
+                            if (post.verseRef != null) append("\n\n${post.verseRef}")
+                            append("\n\nShared from FaithFeed — Where Scripture Meets Scroll")
+                        }
+                        context.startActivity(
+                            Intent.createChooser(
+                                Intent(Intent.ACTION_SEND).apply {
+                                    type = "text/plain"
+                                    putExtra(Intent.EXTRA_TEXT, text)
+                                },
+                                "Share via"
+                            )
+                        )
+                        onShareClick()
+                    }
                 )
             }
         }

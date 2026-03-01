@@ -5,6 +5,7 @@ import androidx.navigation.NavHostController
 import androidx.navigation.compose.composable
 import androidx.navigation.toRoute
 import com.faithfeed.app.ui.screens.bible.BibleReaderScreen
+import com.faithfeed.app.ui.screens.bible.ConcordanceResultsScreen
 import com.faithfeed.app.ui.screens.bible.SemanticSearchScreen
 import com.faithfeed.app.ui.screens.business.BusinessPageScreen
 import com.faithfeed.app.ui.screens.business.CreateBusinessPageScreen
@@ -102,6 +103,20 @@ fun NavGraphBuilder.mainNavGraph(
     }
 
     // ── Bible tools ────────────────────────────────────────────────────────
+    composable<Route.BibleChapter> { entry ->
+        val route = entry.toRoute<Route.BibleChapter>()
+        BibleReaderScreen(
+            navController = navController,
+            initialBook = route.book,
+            initialChapter = route.chapter
+        )
+    }
+
+    composable<Route.ConcordanceResults> { entry ->
+        val route = entry.toRoute<Route.ConcordanceResults>()
+        ConcordanceResultsScreen(strongsTag = route.strongsTag, navController = navController)
+    }
+
     composable<Route.SemanticSearch> {
         SemanticSearchScreen(navController = navController)
     }
@@ -212,7 +227,7 @@ fun NavGraphBuilder.mainNavGraph(
 
     composable<Route.NoteDetail> { entry ->
         val route = entry.toRoute<Route.NoteDetail>()
-        NoteDetailScreen(noteId = route.noteId, navController = navController)
+        NoteDetailScreen(noteId = route.noteId, prefilledVerseRef = route.prefilledVerseRef, navController = navController)
     }
 
     // ── Marketplace detail / create / chat ─────────────────────────────────

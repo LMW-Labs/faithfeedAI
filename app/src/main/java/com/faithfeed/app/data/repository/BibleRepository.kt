@@ -45,6 +45,8 @@ interface BibleRepository {
     suspend fun saveNote(title: String, content: String, verseRef: String?, tags: List<String>): Result<Note>
     suspend fun updateNote(id: String, title: String, content: String, verseRef: String?, tags: List<String>): Result<Note>
     suspend fun deleteNote(noteId: String): Result<Unit>
+    /** Returns user's own notes for a specific verse reference (e.g. "John 3:16") */
+    suspend fun getNotesByVerse(verseRef: String): List<Note>
     /** pgvector semantic search — queries Supabase directly */
     suspend fun semanticSearch(query: String, limit: Int = 10): Result<List<BibleVerse>>
     /** Sync all 31K verses from Supabase into Room on first launch */
@@ -205,6 +207,21 @@ class BibleRepositoryImpl @Inject constructor(
         Result.failure(e)
     }
 
+    override suspend fun getNotesByVerse(verseRef: String): List<Note> {
+        val uid = currentUserId() ?: return emptyList()
+        return runCatching {
+            supabase.from("verse_notes")
+                .select(Columns.raw("*")) {
+                    filter {
+                        eq("user_id", uid)
+                        eq("verse_ref", verseRef)
+                    }
+                    order("created_at", Order.DESCENDING)
+                    limit(20)
+                }.decodeList<Note>()
+        }.getOrDefault(emptyList())
+    }
+
     override suspend fun semanticSearch(query: String, limit: Int): Result<List<BibleVerse>> {
         val apiKey = BuildConfig.OPENAI_API_KEY
         if (apiKey.isBlank()) {
@@ -248,7 +265,7 @@ class BibleRepositoryImpl @Inject constructor(
             val batchSize = 1000
             while (true) {
                 val batch = supabase.from("bible_verses")
-                    .select(Columns.raw("id,book,chapter,verse,text,testament,book_order")) {
+                    .select(Columns.raw("id,book_name,chapter_number,verse_number,text")) {
                         range(offset.toLong(), (offset + batchSize - 1).toLong())
                     }.decodeList<BibleVerse>()
 

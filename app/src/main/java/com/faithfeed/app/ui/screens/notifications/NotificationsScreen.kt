@@ -170,7 +170,7 @@ private fun NotificationRow(notification: Notification) {
 
         Column(modifier = Modifier.weight(1f)) {
             Text(
-                text = notificationText(notification),
+                text = notification.displayText(),
                 fontFamily = Nunito,
                 fontSize = 14.sp,
                 fontWeight = if (isUnread) FontWeight.SemiBold else FontWeight.Normal,
@@ -213,20 +213,6 @@ private fun ActorAvatar(avatarUrl: String?, size: Dp) {
                 modifier = Modifier.size(size * 0.5f)
             )
         }
-    }
-}
-
-private fun notificationText(n: Notification): String {
-    val name = n.actor?.displayName?.takeIf { it.isNotBlank() }
-        ?: n.actor?.username?.takeIf { it.isNotBlank() }
-        ?: "Someone"
-    return when (n.type) {
-        "like"           -> "$name liked your post"
-        "comment"        -> "$name commented on your post"
-        "friend_request" -> "$name sent you a friend request"
-        "prayer"         -> "$name prayed for you"
-        "mention"        -> "$name mentioned you"
-        else             -> "$name interacted with you"
     }
 }
 
