@@ -5,9 +5,11 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -18,6 +20,7 @@ import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -73,6 +76,8 @@ fun BibleReaderScreen(
     val chapters by viewModel.chapters.collectAsStateWithLifecycle()
     val selectedVerse by viewModel.selectedVerse.collectAsStateWithLifecycle()
     val isSpeaking by viewModel.isSpeaking.collectAsStateWithLifecycle()
+    val speakingVerseIndex by viewModel.speakingVerseIndex.collectAsStateWithLifecycle()
+    val scrollSpeed by viewModel.scrollSpeed.collectAsStateWithLifecycle()
     val isAutoScrolling by viewModel.isAutoScrolling.collectAsStateWithLifecycle()
     val verseNotes by viewModel.verseNotes.collectAsStateWithLifecycle()
     val highlights by viewModel.highlights.collectAsStateWithLifecycle()
@@ -92,11 +97,19 @@ fun BibleReaderScreen(
         if (initialChapter != null) viewModel.selectChapter(initialChapter)
     }
 
-    // Autoscroll effect
-    LaunchedEffect(isAutoScrolling) {
-        if (!isAutoScrolling) return@LaunchedEffect
+    // Scroll to whichever verse TTS is currently reading
+    LaunchedEffect(speakingVerseIndex) {
+        if (speakingVerseIndex >= 0 && speakingVerseIndex < verses.size) {
+            listState.animateScrollToItem(speakingVerseIndex)
+        }
+    }
+
+    // Manual autoscroll — pauses while TTS is driving the scroll
+    LaunchedEffect(isAutoScrolling, scrollSpeed, isSpeaking) {
+        if (!isAutoScrolling || isSpeaking) return@LaunchedEffect
+        val interval = (3000L / scrollSpeed).toLong().coerceIn(800L, 8000L)
         while (true) {
-            delay(4000L)
+            delay(interval)
             val next = listState.firstVisibleItemIndex + 1
             if (next < listState.layoutInfo.totalItemsCount) {
                 listState.animateScrollToItem(next)
@@ -121,27 +134,50 @@ fun BibleReaderScreen(
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Column {
+                    // TTS  •  Speed slider  •  Autoscroll
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = 16.dp, vertical = 4.dp),
-                        horizontalArrangement = Arrangement.End,
+                            .padding(horizontal = 4.dp, vertical = 2.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
+                        // TTS stop / indicator
+                        IconButton(onClick = { if (isSpeaking) viewModel.stopSpeaking() }) {
+                            Icon(
+                                imageVector = if (isSpeaking) Icons.Outlined.StopCircle else Icons.Outlined.VolumeUp,
+                                contentDescription = if (isSpeaking) "Stop reading" else "Read aloud",
+                                tint = if (isSpeaking) FaithFeedColors.GoldAccent else FaithFeedColors.TextSecondary,
+                                modifier = Modifier.size(22.dp)
+                            )
+                        }
+                        Text(
+                            text = "${"%.1f".format(scrollSpeed)}×",
+                            style = Typography.labelSmall,
+                            color = if (isSpeaking || isAutoScrolling) FaithFeedColors.GoldAccent else FaithFeedColors.TextTertiary,
+                            modifier = Modifier.width(32.dp),
+                            textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                        )
+                        Slider(
+                            value = scrollSpeed,
+                            onValueChange = { viewModel.setScrollSpeed(it) },
+                            valueRange = 0.5f..2.0f,
+                            steps = 5,
+                            modifier = Modifier.weight(1f),
+                            colors = SliderDefaults.colors(
+                                thumbColor = FaithFeedColors.GoldAccent,
+                                activeTrackColor = FaithFeedColors.GoldAccent.copy(alpha = 0.7f),
+                                inactiveTrackColor = FaithFeedColors.GlassBackground
+                            )
+                        )
+                        // Autoscroll toggle
                         IconButton(onClick = { viewModel.onToggleAutoScroll() }) {
                             Icon(
                                 imageVector = if (isAutoScrolling) Icons.Outlined.PauseCircle else Icons.Outlined.PlayCircle,
-                                contentDescription = "Autoscroll",
+                                contentDescription = if (isAutoScrolling) "Stop autoscroll" else "Start autoscroll",
                                 tint = if (isAutoScrolling) FaithFeedColors.GoldAccent else FaithFeedColors.TextSecondary,
                                 modifier = Modifier.size(22.dp)
                             )
                         }
-                        Spacer(Modifier.width(4.dp))
-                        Text(
-                            text = if (isAutoScrolling) "Scrolling" else "Auto",
-                            style = Typography.labelSmall,
-                            color = if (isAutoScrolling) FaithFeedColors.GoldAccent else FaithFeedColors.TextTertiary
-                        )
                     }
                     HorizontalDivider(color = FaithFeedColors.GlassBorder, thickness = 0.5.dp)
                     Row(
@@ -215,51 +251,85 @@ fun BibleReaderScreen(
                 modifier = Modifier.fillMaxSize(),
                 contentPadding = PaddingValues(horizontal = 16.dp, vertical = 24.dp)
             ) {
-                items(verses, key = { "${it.book}${it.chapter}${it.verse}" }) { verse ->
+                itemsIndexed(verses, key = { _, v -> "${v.book}${v.chapter}${v.verse}" }) { index, verse ->
                     val verseRef = "${verse.book} ${verse.chapter}:${verse.verse}"
                     val isSelected = selectedVerse?.verse == verse.verse
+                    val isReading = index == speakingVerseIndex
                     val highlightHex = highlights[verseRef]
                     val highlightColor = highlightHex?.let {
                         HIGHLIGHT_COLORS.find { (hex, _) -> hex == it }?.second
                     }
                     val bgColor = when {
+                        isReading -> FaithFeedColors.GoldAccent.copy(alpha = 0.20f)
                         isSelected -> FaithFeedColors.GoldAccent.copy(alpha = 0.12f)
                         highlightColor != null -> highlightColor.copy(alpha = 0.15f)
                         else -> FaithFeedColors.BackgroundPrimary
                     }
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .background(bgColor)
-                            .clickable { viewModel.onVerseClick(verse) }
-                            .padding(vertical = 8.dp, horizontal = 4.dp)
-                    ) {
-                        // Highlight indicator strip
-                        if (highlightColor != null) {
-                            Box(
-                                modifier = Modifier
-                                    .width(3.dp)
-                                    .height(20.dp)
-                                    .clip(RoundedCornerShape(2.dp))
-                                    .background(highlightColor)
-                                    .align(Alignment.CenterVertically)
-                            )
-                            Spacer(Modifier.width(6.dp))
-                        }
-                        Text(
-                            text = "${verse.verse}",
-                            style = Typography.labelSmall.copy(fontWeight = FontWeight.Bold),
-                            color = FaithFeedColors.GoldAccent,
+                    var showVerseMenu by remember { mutableStateOf(false) }
+                    Box {
+                        Row(
                             modifier = Modifier
-                                .padding(top = 4.dp, end = 8.dp)
-                                .width(24.dp)
-                        )
-                        Text(
-                            text = verse.text,
-                            style = Typography.bodyLarge.copy(lineHeight = 26.sp),
-                            color = FaithFeedColors.TextPrimary,
-                            fontFamily = Nunito
-                        )
+                                .fillMaxWidth()
+                                .background(bgColor)
+                                .pointerInput(verse.verse) {
+                                    detectTapGestures(
+                                        onTap = { viewModel.onVerseClick(verse) },
+                                        onLongPress = { showVerseMenu = true }
+                                    )
+                                }
+                                .padding(vertical = 8.dp, horizontal = 4.dp)
+                        ) {
+                            // Highlight indicator strip
+                            if (highlightColor != null) {
+                                Box(
+                                    modifier = Modifier
+                                        .width(3.dp)
+                                        .height(20.dp)
+                                        .clip(RoundedCornerShape(2.dp))
+                                        .background(highlightColor)
+                                        .align(Alignment.CenterVertically)
+                                )
+                                Spacer(Modifier.width(6.dp))
+                            }
+                            Text(
+                                text = "${verse.verse}",
+                                style = Typography.labelSmall.copy(
+                                    fontWeight = FontWeight.Bold,
+                                    color = if (isReading) FaithFeedColors.GoldHighlight else FaithFeedColors.GoldAccent
+                                ),
+                                modifier = Modifier
+                                    .padding(top = 4.dp, end = 8.dp)
+                                    .width(24.dp)
+                            )
+                            Text(
+                                text = verse.text,
+                                style = Typography.bodyLarge.copy(lineHeight = 26.sp),
+                                color = if (isReading) FaithFeedColors.TextPrimary else FaithFeedColors.TextPrimary,
+                                fontFamily = Nunito
+                            )
+                        }
+                        DropdownMenu(
+                            expanded = showVerseMenu,
+                            onDismissRequest = { showVerseMenu = false },
+                            containerColor = FaithFeedColors.BackgroundSecondary
+                        ) {
+                            DropdownMenuItem(
+                                text = { Text("Read from here", style = Typography.bodyMedium, color = FaithFeedColors.TextPrimary) },
+                                onClick = {
+                                    showVerseMenu = false
+                                    viewModel.speakFromVerse(index)
+                                },
+                                leadingIcon = { Icon(Icons.Outlined.VolumeUp, null, tint = FaithFeedColors.GoldAccent, modifier = Modifier.size(18.dp)) }
+                            )
+                            DropdownMenuItem(
+                                text = { Text("View Verse", style = Typography.bodyMedium, color = FaithFeedColors.TextPrimary) },
+                                onClick = {
+                                    showVerseMenu = false
+                                    viewModel.onVerseClick(verse)
+                                },
+                                leadingIcon = { Icon(Icons.Outlined.MenuBook, null, tint = FaithFeedColors.GoldAccent, modifier = Modifier.size(18.dp)) }
+                            )
+                        }
                     }
                 }
                 if (verses.isEmpty()) {
