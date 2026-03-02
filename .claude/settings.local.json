@@ -28,7 +28,28 @@
       "Bash(which psql:*)",
       "Bash(powershell.exe:*)",
       "Bash(which python:*)",
-      "Bash(\"$PYTHON\":*)"
+      "Bash(\"$PYTHON\":*)",
+      "Bash(jar tf:*)",
+      "Bash(powershell:*)",
+      "Bash(\"/c/Program Files/Android/Android Studio/jbr/bin/javap\":*)",
+      "WebFetch(domain:github.com)",
+      "Bash(mkdir:*)",
+      "Bash(\"C:/Program Files/Android/Android Studio/jbr/bin/javap.exe\":*)",
+      "Bash(cd:*)",
+      "Bash(unzip:*)",
+      "Bash(./gradlew assembleDebug:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git push:*)",
+      "Bash(./gradlew compileDebugKotlin:*)",
+      "Bash(keytool:*)",
+      "Bash(\"/c/Program Files/Android/Android Studio/jbr/bin/keytool.exe\":*)",
+      "Bash(sed:*)",
+      "Bash(python:*)"
     ]
-  }
+  },
+  "enableAllProjectMcpServers": true,
+  "enabledMcpjsonServers": [
+    "supabase"
+  ]
 }
