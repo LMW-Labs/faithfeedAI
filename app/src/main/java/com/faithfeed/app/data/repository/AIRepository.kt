@@ -2,14 +2,23 @@ package com.faithfeed.app.data.repository
 
 import com.faithfeed.app.BuildConfig
 import com.faithfeed.app.data.model.AIMessage
+import com.faithfeed.app.data.model.TheologicalLane
+import com.faithfeed.app.data.model.VerseSource
+import com.faithfeed.app.data.service.TopicalBibleService
 import io.github.jan.supabase.SupabaseClient
+import io.github.jan.supabase.postgrest.postgrest
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
 import io.ktor.client.request.bearerAuth
 import io.ktor.client.request.post
 import io.ktor.client.request.setBody
+import io.ktor.client.statement.bodyAsText
 import io.ktor.http.ContentType
 import io.ktor.http.contentType
+import io.ktor.http.isSuccess
+import kotlinx.serialization.json.Json
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import java.util.UUID
@@ -21,18 +30,34 @@ import javax.inject.Inject
 private data class OAIMessage(val role: String, val content: String)
 
 @Serializable
+private data class ResponseFormat(val type: String)
+
+@Serializable
 private data class OAIRequest(
     val model: String = "gpt-4o-mini",
     val messages: List<OAIMessage>,
     val temperature: Double = 0.7,
-    @SerialName("max_tokens") val maxTokens: Int = 1024
+    @SerialName("max_tokens") val maxTokens: Int = 1024,
+    @SerialName("response_format") val responseFormat: ResponseFormat? = null
+)
+
+@Serializable
+private data class StudyPartnerResponse(
+    val response: String = "",
+    val sources: List<VerseSource> = emptyList()
 )
 
 @Serializable
 private data class OAIChoice(val message: OAIMessage)
 
 @Serializable
-private data class OAIResponse(val choices: List<OAIChoice>)
+private data class OAIResponse(val choices: List<OAIChoice> = emptyList())
+
+@Serializable
+private data class OAIError(val message: String = "", val type: String = "", val code: String = "")
+
+@Serializable
+private data class OAIErrorWrapper(val error: OAIError = OAIError())
 
 // ── Interface (unchanged) ──────────────────────────────────────────────────────
 
@@ -51,6 +76,12 @@ interface AIRepository {
     suspend fun getVerseCommentary(verseRef: String, verseText: String): Result<String>
     /** Transcribe sermon audio and extract verse references */
     suspend fun transcribeAndExtractVerses(audioPath: String): Result<Pair<String, List<String>>>
+    /**
+     * Calls Supabase RPC `detect_theological_lanes(query_text)` and returns any
+     * sensitive theological topics detected in [queryText]. Always returns success
+     * (empty list on RPC failure) so the chat flow is never blocked.
+     */
+    suspend fun detectTheologicalLanes(queryText: String): Result<List<TheologicalLane>>
 }
 
 // ── Implementation ─────────────────────────────────────────────────────────────
@@ -62,20 +93,35 @@ class AIRepositoryImpl @Inject constructor(
 
     private val openAiUrl = "https://api.openai.com/v1/chat/completions"
 
-    private suspend fun complete(messages: List<OAIMessage>, maxTokens: Int = 1024): Result<String> {
+    private val lenientJson = Json { ignoreUnknownKeys = true; isLenient = true }
+
+    private suspend fun complete(
+        messages: List<OAIMessage>,
+        maxTokens: Int = 1024,
+        jsonMode: Boolean = false
+    ): Result<String> {
         return try {
             val key = BuildConfig.OPENAI_API_KEY
             if (key.isBlank()) return Result.failure(Exception("OpenAI API key not configured. Add OPENAI_API_KEY to local.properties."))
+            val responseFormat = if (jsonMode) ResponseFormat("json_object") else null
             val response = httpClient.post(openAiUrl) {
                 bearerAuth(key)
                 contentType(ContentType.Application.Json)
-                setBody(OAIRequest(messages = messages, maxTokens = maxTokens))
+                setBody(OAIRequest(messages = messages, maxTokens = maxTokens, responseFormat = responseFormat))
+            }
+            if (!response.status.isSuccess()) {
+                val raw = response.bodyAsText()
+                val msg = runCatching { lenientJson.decodeFromString<OAIErrorWrapper>(raw).error.message }
+                    .getOrDefault(raw.take(200))
+                android.util.Log.e("AIRepository", "OpenAI HTTP ${response.status.value}: $msg")
+                return Result.failure(Exception("OpenAI error (${response.status.value}): $msg"))
             }
             val body = response.body<OAIResponse>()
             val content = body.choices.firstOrNull()?.message?.content
                 ?: return Result.failure(Exception("Empty response from OpenAI"))
             Result.success(content.trim())
         } catch (e: Exception) {
+            android.util.Log.e("AIRepository", "OpenAI call failed: ${e::class.simpleName} — ${e.message}")
             Result.failure(e)
         }
     }
@@ -84,17 +130,41 @@ class AIRepositoryImpl @Inject constructor(
         conversationHistory: List<AIMessage>,
         userMessage: String
     ): Result<AIMessage> {
+        val topicalContext = TopicalBibleService.buildContextForMessage(userMessage)
         val system = OAIMessage(
             role = "system",
             content = """You are a knowledgeable and compassionate Bible study partner on the FaithFeed app.
-Answer questions from a Christian perspective, citing relevant scripture where appropriate.
-Keep responses warm, concise, and spiritually grounding. Format for mobile reading — short paragraphs."""
+Answer questions from a Christian perspective. Keep responses warm, concise, and spiritually grounding.
+Format for mobile reading — short paragraphs.
+$topicalContext
+IMPORTANT: Respond ONLY with valid JSON in this exact format:
+{"response": "your answer here", "sources": [{"reference": "Book Chapter:Verse", "text": "verse text"}]}
+Include 1–3 sources when you cite scripture. If no specific verses are relevant, use an empty sources array."""
         )
         val history = conversationHistory.map { OAIMessage(role = it.role, content = it.content) }
         val user = OAIMessage(role = "user", content = userMessage)
-        return complete(listOf(system) + history + user, maxTokens = 512).map { content ->
-            AIMessage(id = UUID.randomUUID().toString(), role = "assistant", content = content)
-        }
+        return complete(listOf(system) + history + user, maxTokens = 600, jsonMode = true)
+            .map { raw ->
+                val parsed = runCatching { lenientJson.decodeFromString<StudyPartnerResponse>(raw) }
+                    .onFailure { android.util.Log.w("AIRepository", "JSON parse failed: ${it.message} | raw=${raw.take(200)}") }
+                    .getOrNull()
+                when {
+                    parsed != null && parsed.response.isNotBlank() -> AIMessage(
+                        id = UUID.randomUUID().toString(),
+                        role = "assistant",
+                        content = parsed.response,
+                        sources = parsed.sources
+                    )
+                    else -> {
+                        // Regex fallback: pull the "response" value out of the JSON string directly
+                        val fallbackText = Regex(""""response"\s*:\s*"((?:[^"\\]|\\.)*)"""")
+                            .find(raw)?.groupValues?.getOrNull(1)
+                            ?.replace("\\n", "\n")?.replace("\\\"", "\"")
+                            ?: raw.trimStart('{').trimEnd('}').trim() // last resort: strip braces
+                        AIMessage(id = UUID.randomUUID().toString(), role = "assistant", content = fallbackText)
+                    }
+                }
+            }
     }
 
     override suspend fun summarizeChapter(
@@ -216,5 +286,19 @@ Write for a general Christian audience — clear, engaging, 250–350 words."""
                 emptyList()
             )
         )
+    }
+
+    override suspend fun detectTheologicalLanes(queryText: String): Result<List<TheologicalLane>> {
+        return try {
+            val lanes = supabase.postgrest.rpc(
+                "detect_theological_lanes",
+                buildJsonObject { put("query_text", queryText) }
+            ).decodeList<TheologicalLane>()
+            Result.success(lanes)
+        } catch (e: Exception) {
+            // Non-fatal: detection enriches the UI but must never break the chat flow
+            android.util.Log.w("AIRepository", "Theological lane detection skipped: ${e.message}")
+            Result.success(emptyList())
+        }
     }
 }
